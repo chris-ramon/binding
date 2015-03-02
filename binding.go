@@ -4,9 +4,10 @@
 package binding
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
-	"io"
+	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"strconv"
@@ -112,9 +113,13 @@ func defaultJsonBinder(req *http.Request, userStruct FieldMapper) Errors {
 	var errs Errors
 
 	if req.Body != nil {
-		defer req.Body.Close()
-		err := json.NewDecoder(req.Body).Decode(userStruct)
-		if err != nil && err != io.EOF {
+		bodyBytes, errReadAll := ioutil.ReadAll(req.Body)
+		if err := json.Unmarshal(bodyBytes, userStruct); err != nil {
+			errs.Add([]string{}, DeserializationError, errReadAll.Error())
+			return errs
+		}
+		req.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+		if err := json.Unmarshal(bodyBytes, userStruct); err != nil {
 			errs.Add([]string{}, DeserializationError, err.Error())
 			return errs
 		}
